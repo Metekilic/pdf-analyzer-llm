@@ -80,3 +80,7 @@ erişilebilir.
 - PDF için etiket ekleme ve etiket ile arama
 - İstatistik paneli ve sohbet geçmişini CSV/JSON olarak indirme
 - Model seçici ile farklı Ollama modellerini kullanabilme
+- Rol tabanlı oturum açma ve çoklu kullanıcı yönetimi
+- Kullanıcı işlemlerini `audit.log` dosyasında tutan denetim kaydı
+- Oturum ve yükleme sayıları için basit analitik toplama
+- GitHub Actions ve Kubernetes tanımları ile konteynerleşmiş dağıtım

@@ -20,6 +20,8 @@ from utils import (
     init_language_tool,
     summarize_documents,
     extract_key_concepts,
+    log_event,
+    record_user_stat,
 )
 
 
@@ -39,6 +41,9 @@ if "notes" not in st.session_state:
     st.session_state.notes = {}
 if "tags" not in st.session_state:
     st.session_state.tags = {}
+if "user" not in st.session_state:
+    st.session_state.user = None
+    st.session_state.role = None
 
 # Yazım denetimi başlat
 _turk_tool = init_language_tool()
@@ -54,6 +59,36 @@ if theme == "Karanlık":
     load_css("dark.css")
 else:
     load_css("style.css")
+
+lang = st.sidebar.selectbox("Dil", ["Türkçe", "English"])
+
+_T = {
+    "Türkçe": {
+        "login": "Giriş",
+        "username": "Kullanıcı Adı",
+        "role": "Rol",
+        "please_login": "Lütfen giriş yapın.",
+    },
+    "English": {
+        "login": "Login",
+        "username": "Username",
+        "role": "Role",
+        "please_login": "Please log in.",
+    },
+}[lang]
+
+with st.sidebar.form("login_form"):
+    user_in = st.text_input(_T["username"])
+    role_in = st.selectbox(_T["role"], ["görüntüleyici", "editör", "yönetici"])
+    submitted = st.form_submit_button(_T["login"])
+    if submitted and user_in:
+        st.session_state.user = user_in
+        st.session_state.role = role_in
+        log_event(user_in, "login")
+
+if not st.session_state.user:
+    st.info(_T["please_login"])
+    st.stop()
 
 
 def load_uploaded_pdf(uploaded, db_path):
@@ -79,7 +114,9 @@ def load_uploaded_pdf(uploaded, db_path):
     )
 
     vectordb = FAISS.from_documents(docs, embed)
-    vectordb.save_local(db_path)
+    user_dir = os.path.join(db_path, st.session_state.user)
+    os.makedirs(user_dir, exist_ok=True)
+    vectordb.save_local(user_dir)
     retriever = vectordb.as_retriever(search_kwargs={"k": 8})
 
     os.remove(pdf_path)
@@ -138,7 +175,9 @@ st.title("📚 Türkçe PDF RAG Chatbot + Qwen3:8B")
 st.markdown("Qwen3:8B • Ollama • LangChain • FAISS • Çıkarım + Karakter Onarımı + Tekrar Engelleme")
 
 db_path = "faiss_index"
-uploaded = st.file_uploader("PDF yükle (.pdf)", type="pdf")
+uploaded = None
+if st.session_state.role != "görüntüleyici":
+    uploaded = st.file_uploader("PDF yükle (.pdf)", type="pdf")
 tags_input = st.text_input("Etiketler (virgül ile)")
 if st.session_state.tags:
     tag_filter = st.sidebar.selectbox(
@@ -160,6 +199,7 @@ if datetime.utcnow() - st.session_state.start_time > timedelta(hours=6):
 if st.sidebar.button("🧹 Sohbeti Temizle"):
     st.session_state.history = []
     st.session_state.pop("summary", None)
+    log_event(st.session_state.user, "clear_chat")
 
 if st.session_state.history:
     chat_text = "\n".join(f"{r}: {m}" for r, m in st.session_state.history)
@@ -186,6 +226,8 @@ if uploaded and "retriever" not in st.session_state:
         st.session_state.retriever = retriever
         st.session_state.docs = docs
         st.session_state.pages = pages
+        log_event(st.session_state.user, f"upload:{uploaded.name}")
+        record_user_stat(st.session_state.user, "uploads")
         if tags_input:
             st.session_state.tags[uploaded.name] = [t.strip() for t in tags_input.split(',') if t.strip()]
 
@@ -205,6 +247,8 @@ if "docs" in st.session_state:
     if st.sidebar.button("📰 PDF'yi Özetle"):
         with st.spinner("Özet çıkarılıyor..."):
             st.session_state.summary = summarize_documents(st.session_state.docs)
+            log_event(st.session_state.user, "summarize")
+            record_user_stat(st.session_state.user, "summaries")
     if st.session_state.get("summary"):
         st.sidebar.markdown("### Özet")
         st.sidebar.write(st.session_state.summary)
@@ -215,6 +259,14 @@ if "docs" in st.session_state:
     st.sidebar.write(f"Toplam kelime: {words}")
     st.sidebar.write(f"Soru sayısı: {st.session_state.question_count}")
     st.sidebar.write(f"Özet uzunluğu: {summary_len}")
+
+    if os.path.exists("analytics.json"):
+        with open("analytics.json", "r", encoding="utf-8") as f:
+            stats = json.load(f)
+        user_stats = stats.get(st.session_state.user, {})
+        st.sidebar.markdown("### Kullanıcı Analitiği")
+        for key, val in user_stats.items():
+            st.sidebar.write(f"{key}: {val}")
 
 # Model ve zincir
 if "retriever" in st.session_state:
@@ -233,6 +285,9 @@ if "retriever" in st.session_state:
             except Exception as e:
                 st.error(f"Model çağrısında hata oluştu: {e}")
                 raw_answer = "**YETERSİZ VERİ**"
+
+        log_event(st.session_state.user, f"question:{q}")
+        record_user_stat(st.session_state.user, "questions")
 
         response = clean_output(raw_answer)
 

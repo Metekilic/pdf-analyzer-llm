@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdf-chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pdf-chatbot
+  template:
+    metadata:
+      labels:
+        app: pdf-chatbot
+    spec:
+      containers:
+        - name: app
+          image: pdf-chatbot:latest
+          ports:
+            - containerPort: 8501
