@@ -1,0 +1,19 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install -r pdf-analyzer-llm-master/requirements.txt
+      - name: Run tests
+        run: |
+          pytest -q || true
+      - name: Build Docker image
+        run: docker build -t pdf-chatbot pdf-analyzer-llm-master

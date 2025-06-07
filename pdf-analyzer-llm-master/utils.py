@@ -1,6 +1,9 @@
 # Utility functions for the PDF chatbot
 import re
 import language_tool_python
+import os
+import json
+from datetime import datetime
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms.ollama import Ollama
 
@@ -47,4 +50,36 @@ def summarize_documents(docs, max_chunks: int = 10) -> str:
     )
     summary = llm.invoke(prompt.format(context=text))
     return clean_output(summary)
+
+
+def extract_key_concepts(text: str, n: int = 5) -> list[str]:
+    """Return a list of key concept words."""
+    words = re.findall(r"\b\w{5,}\b", text.lower())
+    freq = {}
+    for w in words:
+        freq[w] = freq.get(w, 0) + 1
+    return [w for w, _ in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:n]]
+
+
+def log_event(user: str, action: str) -> None:
+    """Append an audit log entry to audit.log."""
+    line = f"{datetime.utcnow().isoformat()}," f"{user},{action}\n"
+    with open("audit.log", "a", encoding="utf-8") as f:
+        f.write(line)
+
+
+def record_user_stat(user: str, key: str) -> None:
+    """Increment a usage counter for the given user and key."""
+    path = "analytics.json"
+    stats = {}
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                stats = json.load(f)
+        except Exception:
+            stats = {}
+    stats.setdefault(user, {})
+    stats[user][key] = stats[user].get(key, 0) + 1
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(stats, f)
 

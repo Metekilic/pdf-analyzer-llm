@@ -47,7 +47,7 @@ işlemler bu yardımcı modüller aracılığıyla yürütülür.
 
 ---
 
-## ✨ Yeni Arayüz
+## ✨ Yeni Arayüz ve Özellikler
 
 Uygulama Streamlit bileşenleri ve özel CSS kullanılarak modern bir görünüme
 kavuşturuldu. Aşağıda önceki ve yeni arayüzden kesitler yer almaktadır:
@@ -72,3 +72,15 @@ Yeni görünüm (özet):
 Yeni tasarım sade renkler, daha büyük butonlar ve mobil uyumlu bir yerleşim
 sunar. Chat mesajları baloncuk şeklinde gösterilir ve tüm denetimler tek tıkla
 erişilebilir.
+
+### Eklenen Başlıca Özellikler
+
+- Sayfa bazlı önizleme ve not bırakma
+- Karanlık/Aydınlık tema seçimi
+- PDF için etiket ekleme ve etiket ile arama
+- İstatistik paneli ve sohbet geçmişini CSV/JSON olarak indirme
+- Model seçici ile farklı Ollama modellerini kullanabilme
+- Rol tabanlı oturum açma ve çoklu kullanıcı yönetimi
+- Kullanıcı işlemlerini `audit.log` dosyasında tutan denetim kaydı
+- Oturum ve yükleme sayıları için basit analitik toplama
+- GitHub Actions ve Kubernetes tanımları ile konteynerleşmiş dağıtım
