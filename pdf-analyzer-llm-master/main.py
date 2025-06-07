@@ -221,6 +221,7 @@ if "retriever" in st.session_state:
     model_name = st.sidebar.selectbox(
         "Model", ["qwen3:8b", "mistral", "phi3"], index=0
     )
+    st.sidebar.markdown(f"**Model:** {model_name}")
     qa = create_qa_chain(st.session_state.retriever, model_name)
 
     q = st.chat_input("Sorunuz")
@@ -250,8 +251,6 @@ if "retriever" in st.session_state:
 
 else:
     st.info("Lütfen bir PDF yükleyin.")
-
-st.sidebar.markdown(f"**Model:** {model_name}")
 #docs = st.session_state.retriever.get_relevant_documents(q)
 #context = "\n".join([doc.page_content for doc in docs])
 #st.markdown("### 🔍 Modelin Gördüğü Bağlam:")
