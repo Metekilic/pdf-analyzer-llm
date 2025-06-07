@@ -48,3 +48,12 @@ def summarize_documents(docs, max_chunks: int = 10) -> str:
     summary = llm.invoke(prompt.format(context=text))
     return clean_output(summary)
 
+
+def extract_key_concepts(text: str, n: int = 5) -> list[str]:
+    """Return a list of key concept words."""
+    words = re.findall(r"\b\w{5,}\b", text.lower())
+    freq = {}
+    for w in words:
+        freq[w] = freq.get(w, 0) + 1
+    return [w for w, _ in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:n]]
+
