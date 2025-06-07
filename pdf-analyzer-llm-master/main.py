@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 import tempfile
-import re
 from langchain.memory import ConversationBufferMemory
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
@@ -10,84 +9,74 @@ from langchain_core.prompts import PromptTemplate
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms.ollama import Ollama
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import language_tool_python
+
+from utils import (
+    clean_output,
+    fix_encoding,
+    init_language_tool,
+    summarize_documents,
+)
+
+
+def load_css(path: str) -> None:
+    """Load a local CSS file into the Streamlit app."""
+    with open(path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # Ortam değişkeni
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 # Yazım denetimi başlat
-try:
-    _turk_tool = language_tool_python.LanguageTool("tr")
-except Exception:
-    _turk_tool = None
+_turk_tool = init_language_tool()
 
-# Karakter düzeltici
-def fix_encoding(text: str) -> str:
-    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
-    text = text.replace("ý", "ı").replace("þ", "ş").replace("ð", "ğ") \
-               .replace("Ý", "İ").replace("Þ", "Ş").replace("Ð", "Ğ")
-    return text
+st.set_page_config(
+    page_title="PDF Analyzer Chatbot",
+    page_icon="📚",
+    layout="centered",
+)
+load_css("style.css")
 
-# Yanıt temizleyici
-def clean_output(text: str) -> str:
-    text = re.sub(r"<think[^>]*>.*?</think[^>]*>", "", text, flags=re.I | re.S)
-    text = re.sub(r"<.*?>", "", text, flags=re.I | re.S)
-    text = re.sub(r"\s{2,}", " ", text)
-    return fix_encoding(text.strip())
 
-# Başlık
-st.title("📚 Türkçe PDF RAG Chatbot + Qwen3:8B")
-st.markdown("Qwen3:8B • Ollama • LangChain • FAISS • Çıkarım + Karakter Onarımı + Tekrar Engelleme")
+def load_uploaded_pdf(uploaded, db_path):
+    """Load and index the uploaded PDF file."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(uploaded.read())
+        pdf_path = tmp.name
 
-db_path = "faiss_index"
-uploaded = st.file_uploader("PDF yükle (.pdf)", type="pdf")
+    loader = PyPDFLoader(pdf_path)
+    raw_docs = loader.load()
 
-# Oturum geçmişi
-if "history" not in st.session_state:
-    st.session_state.history = []
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=750, chunk_overlap=150
+    )
+    docs = text_splitter.split_documents(raw_docs)
 
-# PDF yüklendiğinde çalış
-if uploaded and "retriever" not in st.session_state:
-    with st.spinner("PDF işleniyor..."):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(uploaded.read())
-            pdf_path = tmp.name
+    for doc in docs:
+        doc.page_content = fix_encoding(doc.page_content)
 
-        loader = PyPDFLoader(pdf_path)
-        raw_docs = loader.load()
+    embed = HuggingFaceEmbeddings(
+        model_name="intfloat/multilingual-e5-small",
+        model_kwargs={"device": "cpu"},
+    )
 
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=750, chunk_overlap=150)
-        docs = text_splitter.split_documents(raw_docs)
+    vectordb = FAISS.from_documents(docs, embed)
+    vectordb.save_local(db_path)
+    retriever = vectordb.as_retriever(search_kwargs={"k": 8})
 
-        # PDF içeriğini önceden karakter düzelt
-        for doc in docs:
-            doc.page_content = fix_encoding(doc.page_content)
+    os.remove(pdf_path)
+    return retriever, docs
 
-        embed = HuggingFaceEmbeddings(
-            model_name="intfloat/multilingual-e5-small",
-            model_kwargs={"device": "cpu"}
-        )
 
-        vectordb = FAISS.from_documents(docs, embed)
-        vectordb.save_local(db_path)
-        #retriever = vectordb.as_retriever(search_kwargs={"k": 5})
-        retriever = vectordb.as_retriever(search_kwargs={"k": 8})
-
-        st.session_state.retriever = retriever
-        st.session_state.docs = docs
-
-        os.remove(pdf_path)
-
-# Model ve zincir
-if "retriever" in st.session_state:
+def create_qa_chain(retriever):
+    """Build conversational retrieval chain."""
     llm = Ollama(
         model="qwen3:8b",
         base_url="http://host.docker.internal:11434",
-        temperature=0.3
+        temperature=0.3,
     )
 
-    answer_prompt = PromptTemplate.from_template("""
-Aşağıdaki belgeye dayanarak soruyu yanıtla.
+    answer_prompt = PromptTemplate.from_template(
+        """Aşağıdaki belgeye dayanarak soruyu yanıtla.
 
 Yanıt verirken:
 - Öncelikle belgeyi dikkatlice analiz et.
@@ -107,20 +96,64 @@ Yanıt verirken:
 {question}
 
 ### Yanıt:
-""")
-
-    condense_prompt = PromptTemplate.from_template("Sadece soruyu sadeleştir: {question}")
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True, k=5)
-
-    qa = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=st.session_state.retriever,
-        memory=memory,
-        condense_question_prompt=condense_prompt,
-        combine_docs_chain_kwargs={"prompt": answer_prompt}
+"""
     )
 
-    q = st.text_input("Sorunuz:")
+    condense_prompt = PromptTemplate.from_template(
+        "Sadece soruyu sadeleştir: {question}"
+    )
+    memory = ConversationBufferMemory(
+        memory_key="chat_history", return_messages=True, k=5
+    )
+
+    return ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=retriever,
+        memory=memory,
+        condense_question_prompt=condense_prompt,
+        combine_docs_chain_kwargs={"prompt": answer_prompt},
+    )
+
+# Başlık
+st.title("📚 Türkçe PDF RAG Chatbot + Qwen3:8B")
+st.markdown("Qwen3:8B • Ollama • LangChain • FAISS • Çıkarım + Karakter Onarımı + Tekrar Engelleme")
+
+db_path = "faiss_index"
+uploaded = st.file_uploader("PDF yükle (.pdf)", type="pdf")
+
+# Oturum geçmişi
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# Sidebar actions
+if st.sidebar.button("🧹 Sohbeti Temizle"):
+    st.session_state.history = []
+    st.session_state.pop("summary", None)
+
+if st.session_state.history:
+    chat_text = "\n".join(f"{r}: {m}" for r, m in st.session_state.history)
+    st.sidebar.download_button("💾 Sohbeti İndir", chat_text, "chat_history.txt")
+
+# PDF yüklendiğinde çalış
+if uploaded and "retriever" not in st.session_state:
+    with st.spinner("PDF işleniyor..."):
+        retriever, docs = load_uploaded_pdf(uploaded, db_path)
+        st.session_state.retriever = retriever
+        st.session_state.docs = docs
+
+if "docs" in st.session_state:
+    if st.sidebar.button("📰 PDF'yi Özetle"):
+        with st.spinner("Özet çıkarılıyor..."):
+            st.session_state.summary = summarize_documents(st.session_state.docs)
+    if st.session_state.get("summary"):
+        st.sidebar.markdown("### Özet")
+        st.sidebar.write(st.session_state.summary)
+
+# Model ve zincir
+if "retriever" in st.session_state:
+    qa = create_qa_chain(st.session_state.retriever)
+
+    q = st.chat_input("Sorunuz")
     if q:
         with st.spinner("Cevap hazırlanıyor..."):
             try:
@@ -141,7 +174,8 @@ Yanıt verirken:
         st.session_state.history += [("Siz", q), ("Asistan", response)]
 
     for role, msg in st.session_state.history:
-        st.markdown(f"**{role}:** {msg}")
+        with st.chat_message("user" if role == "Siz" else "assistant"):
+            st.markdown(msg)
 
 else:
     st.info("Lütfen bir PDF yükleyin.")
