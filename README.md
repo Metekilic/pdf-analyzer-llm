@@ -15,6 +15,7 @@ Belirttiğiniz PDF dosyaları üzerinden veri çıkarımı yapar, semantik arama
 - 🧹 Sohbeti tek tıkla temizleme
 - 📝 Sohbet geçmişini indirme
 - 📰 PDF'yi özetleme
+- 🎨 Göz yormayan modern arayüz
 
 ---
 
@@ -43,3 +44,31 @@ docker-compose up --build
 Uygulama kodu `main.py` dosyasında başlayıp yardımcı işlevlerin yer aldığı
 `utils.py` dosyasını kullanır. PDF yükleme ve model zinciri oluşturma gibi
 işlemler bu yardımcı modüller aracılığıyla yürütülür.
+
+---
+
+## ✨ Yeni Arayüz
+
+Uygulama Streamlit bileşenleri ve özel CSS kullanılarak modern bir görünüme
+kavuşturuldu. Aşağıda önceki ve yeni arayüzden kesitler yer almaktadır:
+
+```
+Önceki görünüm:
+-------------------------------------
+| 📚 Türkçe PDF RAG Chatbot + Qwen3 |
+| PDF yükle alanı                  |
+| Sorunuz: _______________________ |
+-------------------------------------
+
+Yeni görünüm (özet):
+-------------------------------------
+| 📚 PDF Analyzer Chatbot          |
+| PDF yükle alanı                  |
+| Chat baloncukları ve alt kısımda |
+| mesaj girişi                    |
+-------------------------------------
+```
+
+Yeni tasarım sade renkler, daha büyük butonlar ve mobil uyumlu bir yerleşim
+sunar. Chat mesajları baloncuk şeklinde gösterilir ve tüm denetimler tek tıkla
+erişilebilir.

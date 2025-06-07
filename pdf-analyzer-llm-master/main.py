@@ -17,11 +17,24 @@ from utils import (
     summarize_documents,
 )
 
+
+def load_css(path: str) -> None:
+    """Load a local CSS file into the Streamlit app."""
+    with open(path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 # Ortam değişkeni
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 # Yazım denetimi başlat
 _turk_tool = init_language_tool()
+
+st.set_page_config(
+    page_title="PDF Analyzer Chatbot",
+    page_icon="📚",
+    layout="centered",
+)
+load_css("style.css")
 
 
 def load_uploaded_pdf(uploaded, db_path):
@@ -113,13 +126,13 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # Sidebar actions
-if st.sidebar.button("Sohbeti Temizle"):
+if st.sidebar.button("🧹 Sohbeti Temizle"):
     st.session_state.history = []
     st.session_state.pop("summary", None)
 
 if st.session_state.history:
     chat_text = "\n".join(f"{r}: {m}" for r, m in st.session_state.history)
-    st.sidebar.download_button("Sohbeti İndir", chat_text, "chat_history.txt")
+    st.sidebar.download_button("💾 Sohbeti İndir", chat_text, "chat_history.txt")
 
 # PDF yüklendiğinde çalış
 if uploaded and "retriever" not in st.session_state:
@@ -129,7 +142,7 @@ if uploaded and "retriever" not in st.session_state:
         st.session_state.docs = docs
 
 if "docs" in st.session_state:
-    if st.sidebar.button("PDF'yi Özetle"):
+    if st.sidebar.button("📰 PDF'yi Özetle"):
         with st.spinner("Özet çıkarılıyor..."):
             st.session_state.summary = summarize_documents(st.session_state.docs)
     if st.session_state.get("summary"):
@@ -140,7 +153,7 @@ if "docs" in st.session_state:
 if "retriever" in st.session_state:
     qa = create_qa_chain(st.session_state.retriever)
 
-    q = st.text_input("Sorunuz:")
+    q = st.chat_input("Sorunuz")
     if q:
         with st.spinner("Cevap hazırlanıyor..."):
             try:
@@ -161,7 +174,8 @@ if "retriever" in st.session_state:
         st.session_state.history += [("Siz", q), ("Asistan", response)]
 
     for role, msg in st.session_state.history:
-        st.markdown(f"**{role}:** {msg}")
+        with st.chat_message("user" if role == "Siz" else "assistant"):
+            st.markdown(msg)
 
 else:
     st.info("Lütfen bir PDF yükleyin.")
