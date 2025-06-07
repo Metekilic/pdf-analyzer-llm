@@ -35,3 +35,7 @@ ollama run qwen3:8b
 
 # Uygulamayı başlat
 docker-compose up --build
+
+Uygulama kodu `main.py` dosyasında başlayıp yardımcı işlevlerin yer aldığı
+`utils.py` dosyasını kullanır. PDF yükleme ve model zinciri oluşturma gibi
+işlemler bu yardımcı modüller aracılığıyla yürütülür.
