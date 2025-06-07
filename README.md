@@ -12,6 +12,9 @@ Belirttiğiniz PDF dosyaları üzerinden veri çıkarımı yapar, semantik arama
 - 📁 Çoklu PDF dosya desteği
 - 💬 Streamlit tabanlı kullanıcı dostu arayüz
 - 🔌 Ollama destekli yerel model çalıştırma (örneğin: `qwen3:8b`, `mistral`, `phi3`)
+- 🧹 Sohbeti tek tıkla temizleme
+- 📝 Sohbet geçmişini indirme
+- 📰 PDF'yi özetleme
 
 ---
 
@@ -35,6 +38,7 @@ ollama run qwen3:8b
 
 # Uygulamayı başlat
 docker-compose up --build
+```
 
 Uygulama kodu `main.py` dosyasında başlayıp yardımcı işlevlerin yer aldığı
 `utils.py` dosyasını kullanır. PDF yükleme ve model zinciri oluşturma gibi

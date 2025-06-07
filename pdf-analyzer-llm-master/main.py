@@ -10,7 +10,12 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms.ollama import Ollama
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from utils import clean_output, fix_encoding, init_language_tool
+from utils import (
+    clean_output,
+    fix_encoding,
+    init_language_tool,
+    summarize_documents,
+)
 
 # Ortam değişkeni
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
@@ -107,12 +112,29 @@ uploaded = st.file_uploader("PDF yükle (.pdf)", type="pdf")
 if "history" not in st.session_state:
     st.session_state.history = []
 
+# Sidebar actions
+if st.sidebar.button("Sohbeti Temizle"):
+    st.session_state.history = []
+    st.session_state.pop("summary", None)
+
+if st.session_state.history:
+    chat_text = "\n".join(f"{r}: {m}" for r, m in st.session_state.history)
+    st.sidebar.download_button("Sohbeti İndir", chat_text, "chat_history.txt")
+
 # PDF yüklendiğinde çalış
 if uploaded and "retriever" not in st.session_state:
     with st.spinner("PDF işleniyor..."):
         retriever, docs = load_uploaded_pdf(uploaded, db_path)
         st.session_state.retriever = retriever
         st.session_state.docs = docs
+
+if "docs" in st.session_state:
+    if st.sidebar.button("PDF'yi Özetle"):
+        with st.spinner("Özet çıkarılıyor..."):
+            st.session_state.summary = summarize_documents(st.session_state.docs)
+    if st.session_state.get("summary"):
+        st.sidebar.markdown("### Özet")
+        st.sidebar.write(st.session_state.summary)
 
 # Model ve zincir
 if "retriever" in st.session_state:

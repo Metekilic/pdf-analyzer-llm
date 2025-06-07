@@ -1,6 +1,8 @@
 # Utility functions for the PDF chatbot
 import re
 import language_tool_python
+from langchain_core.prompts import PromptTemplate
+from langchain_community.llms.ollama import Ollama
 
 
 def init_language_tool():
@@ -30,3 +32,19 @@ def clean_output(text: str) -> str:
     text = re.sub(r"<.*?>", "", text, flags=re.I | re.S)
     text = re.sub(r"\s{2,}", " ", text)
     return fix_encoding(text.strip())
+
+
+def summarize_documents(docs, max_chunks: int = 10) -> str:
+    """Generate a brief summary from the provided documents."""
+    text = "\n".join(doc.page_content for doc in docs[:max_chunks])
+    llm = Ollama(
+        model="qwen3:8b",
+        base_url="http://host.docker.internal:11434",
+        temperature=0.3,
+    )
+    prompt = PromptTemplate.from_template(
+        "Aşağıdaki belge içeriğini kısaca özetle:\n{context}\n\nÖzet:"
+    )
+    summary = llm.invoke(prompt.format(context=text))
+    return clean_output(summary)
+
